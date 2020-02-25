@@ -5,12 +5,12 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
 
+import com.google.android.things.contrib.driver.adc.mcp300x.Mcp300x;
 import com.google.android.things.pio.Gpio;
 import com.google.android.things.pio.GpioCallback;
 import com.google.android.things.pio.I2cDevice;
 import com.google.android.things.pio.PeripheralManager;
 import com.ua.jenchen.drivers.mcp23017.MCP23017;
-import com.ua.jenchen.drivers.mcp23017.MCP23017GPIO;
 
 import java.io.IOException;
 import java.util.List;
@@ -40,11 +40,13 @@ import java.util.concurrent.Executors;
 public class MainActivity extends Activity {
 
     private static final String I2C_DEVICE_NAME = "I2C1";//Pi
+    private static final String SPI_DEVICE_NAME = "SPI0.0";//Pi SPI0.0 or SPI0.1
     private final static String TAG = "I2C address scanner";
     private final static long DELAY_BETWEEN_SCANS = 5; //in seconds
     private final static int TEST_REGISTER = 0x0;
     private static final int MCP_ADDRESS = 0x20; // dec 23
     private static final int INTERVAL_BETWEEN_BLINKS_MS = 250;
+    private static final double ADC_FACTOR = 3.3/1023;
 
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
     private final PeripheralManager peripheralManager = PeripheralManager.getInstance();
@@ -54,26 +56,20 @@ public class MainActivity extends Activity {
     private Handler mHandler = new Handler();
     private boolean mLedState = false;
 
+    private Mcp300x mcp300x; //MCP3008 8ch adc
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        //Log.d(TAG, "on create");
+        //scanPiPorts();
+
+        //I2C MCP23017 setup and test
+
+        //performI2CScan();
 
         /*try {
-
-            mcpA6 = PeripheralManager.getInstance().openGpio("BCM26");
-            mcpA6.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW);
-            Log.i(TAG, "Start blinking LED GPIO pin");
-            // Post a Runnable that continuously switch the state of the GPIO, blinking the
-            // corresponding LED
-            mHandler.post(mBlinkRunnable);
-        } catch (IOException e) {
-            Log.e(TAG, "Error on PeripheralIO API", e);
-        }*/
-
-        try {
             mcp23017 = new MCP23017(
                     I2C_DEVICE_NAME,    // required I2C
                     MCP_ADDRESS        // address of MCP23017
@@ -81,13 +77,11 @@ public class MainActivity extends Activity {
         } catch (IOException e) {
             // couldn't configure the IO expander
             Log.d(TAG, "error: " + e.getMessage());
-        }
+        }*/
 
-        //scanPiPorts();
         //Log.i(TAG, "Address: " + mcp23017.getAddress());
 
-
-        try {
+        /*try {
 
             mcpA5 = mcp23017.openGpio(MCP23017GPIO.A5);
             mcpA5.setDirection(Gpio.DIRECTION_IN);
@@ -112,11 +106,7 @@ public class MainActivity extends Activity {
         } catch (IOException e) {
             // couldn't configure GPIO
             Log.d(TAG, "error: " + e.getMessage());
-        }
-
-
-
-        //performScan();
+        }*/
 
         /*if (savedInstanceState == null) {
 
@@ -132,7 +122,21 @@ public class MainActivity extends Activity {
 
             executorService.submit(scan);
         }*/
+
+
+        //SPI MCP3008 adc setup and test
+
+        //performSPIScan();
+
+        try {
+            mcp300x = new Mcp300x(SPI_DEVICE_NAME, Mcp300x.Configuration.MCP3008);
+            double ch0Value = mcp300x.readSingleEndedInput(0) * ADC_FACTOR;
+            Log.d(TAG, "Ch 0 voltage: " + ch0Value + " V");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
+
 
     private GpioCallback mGpioCallback = new GpioCallback() {
         @Override
@@ -201,7 +205,18 @@ public class MainActivity extends Activity {
 
     }
 
-    private void performScan() {
+    private void performSPIScan() {
+
+        PeripheralManager manager = PeripheralManager.getInstance();
+        List<String> deviceList = manager.getSpiBusList();
+        if (deviceList.isEmpty()) {
+            Log.i(TAG, "No SPI bus available on this device.");
+        } else {
+            Log.i(TAG, "List of available devices: " + deviceList);
+        }
+    }
+
+    private void performI2CScan() {
 
         List<String> deviceList = peripheralManager.getI2cBusList();
         if (deviceList.isEmpty()) {
